@@ -4,7 +4,8 @@
 """
 NumberPanel OTP Bot
 Mode: LAST 3 OTP ONLY
-Heroku Anti-Empty-Response Version
+sesskey + PHPSESSID FIXED
+Heroku / VPS Compatible
 """
 
 import time
@@ -14,13 +15,15 @@ import requests
 from datetime import datetime
 
 # ================= CONFIG =================
-BASE_URL = "http://51.89.99.105/NumberPanel"
 API_URL = "http://51.89.99.105/NumberPanel/client/res/data_smscdr.php"
 
-PHPSESSID = "ct38cra540a4hil76g82dirrft"
-BOT_TOKEN = "7448362382:AAGzYcF4XH5cAOIOsrvJ6E9MXqjnmOdKs2o"
+# 🔐 NEW VALUES (as provided by you)
+PHPSESSID = "oktoq8i2e1ebb5mjtp5nkumprd"
+SESSKEY   = "Q05RR0FPT0pBVQ=="
 
-CHAT_ID = "-1003405109562"
+BOT_TOKEN = "PASTE_YOUR_TELEGRAM_BOT_TOKEN"
+CHAT_ID   = "-1003405109562"
+
 CHECK_INTERVAL = 12
 STATE_FILE = "state.json"
 
@@ -28,10 +31,14 @@ STATE_FILE = "state.json"
 HEADERS = {
     "Accept": "application/json, text/javascript, */*; q=0.01",
     "X-Requested-With": "XMLHttpRequest",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "Referer": f"{BASE_URL}/client/SMSDashboard",
-    "Accept-Encoding": "identity",   # 🔥 gzip OFF
-    "Connection": "close",            # 🔥 keep-alive OFF
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Referer": "http://51.89.99.105/NumberPanel/client/SMSDashboard",
+    "Accept-Encoding": "identity",
+    "Connection": "close",
 }
 
 # ================= HELPERS =================
@@ -41,10 +48,16 @@ def load_state():
     except Exception:
         return {"sent": []}
 
-def save_state(state):
-    json.dump(state, open(STATE_FILE, "w"))
+def save_state(data):
+    json.dump(data, open(STATE_FILE, "w"))
 
 def extract_otp(text):
+    """
+    Supports:
+    123456
+    589-837
+    589 837
+    """
     if not text:
         return None
     m = re.search(r"\b(\d{3,4}[-\s]?\d{3,4})\b", text)
@@ -73,16 +86,16 @@ sent = state["sent"]
 
 while True:
     try:
-        # 🔥 NEW SESSION PER REQUEST (IMPORTANT)
         cookies = {
             "PHPSESSID": PHPSESSID
         }
 
         params = {
-            "fdate1": "2025-01-01 00:00:00",
+            "sesskey": SESSKEY,                    # 🔥 REQUIRED
+            "fdate1": "2026-01-09 00:00:00",
             "fdate2": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "iDisplayStart": 0,
-            "iDisplayLength": 3,
+            "iDisplayLength": 3,                  # 🔥 LAST 3 ONLY
             "sEcho": 1,
             "_": int(time.time() * 1000),
         }
@@ -92,23 +105,23 @@ while True:
             headers=HEADERS,
             cookies=cookies,
             params=params,
-            timeout=10
+            timeout=15
         )
 
         if not r.text or not r.text.strip():
-            print("⚠️ Empty response (server dropped body)")
+            print("⚠️ Empty response")
             time.sleep(CHECK_INTERVAL)
             continue
 
         if "login" in r.text.lower():
-            print("🔐 SESSION EXPIRED — UPDATE PHPSESSID")
+            print("🔐 Session expired (login page detected)")
             time.sleep(60)
             continue
 
         try:
             data = r.json()
         except Exception:
-            print("⚠️ Non-JSON response")
+            print("⚠️ JSON parse failed")
             print(r.text[:200])
             time.sleep(CHECK_INTERVAL)
             continue
@@ -118,7 +131,8 @@ while True:
             time.sleep(CHECK_INTERVAL)
             continue
 
-        rows.reverse()  # oldest → newest
+        # Oldest → Newest (clean order)
+        rows.reverse()
 
         for row in rows:
             ts, pool, number, service, message = row[:5]
@@ -143,6 +157,7 @@ while True:
 
             sent.append(key)
 
+        # keep memory small
         sent = sent[-10:]
         save_state({"sent": sent})
 
