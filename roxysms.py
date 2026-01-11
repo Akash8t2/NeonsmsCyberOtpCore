@@ -29,7 +29,7 @@ HEADERS = {
     "Accept": "application/json, text/javascript, */*; q=0.01"
 }
 
-CHECK_INTERVAL = 5  # seconds
+CHECK_INTERVAL = 15  # seconds
 STATE_FILE = "state.json"
 
 SUPPORT_URL = "https://t.me/botcasx"
